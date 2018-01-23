@@ -1,72 +1,132 @@
 package agh;
 
+import com.google.common.collect.ImmutableSet;
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-
-import com.google.common.collect.ImmutableSet;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.apache.commons.lang3.tuple.Pair;
+import java.util.stream.Collectors;
 
 public class Solver {
 
+    private static final double ALPHA = 0.66;
+    private static final double BETA = 0.00002;
+    private static final double GAMMA = 0.00002;
+
     private String[] knowledgeBase;
-    private Set<String> stimulusWords = ImmutableSet.of("word");
-    private Map<Pair<String, String>, Integer> connections = new HashMap<>();
+    private Set<String> stimulusWords = ImmutableSet.of("matka", "dobra", "dom", "dziecko");
+    private Map<String, Map<String, Integer>> connections = new HashMap<>();
     private Map<String, Integer> stimulusCounter = new HashMap<>();
     private Map<String, Integer> otherFrequencies = new HashMap<>();
 
-    public Solver(String[] knowledgeBase) {
+    private Map<String, Map<String, Double>> associations = new HashMap<>();
+
+    Solver(String[] knowledgeBase) {
         this.knowledgeBase = knowledgeBase;
     }
 
     public void computeAssociations() {
         for (int i = 0; i < knowledgeBase.length; i++) {
             if (stimulusWords.contains(knowledgeBase[i])) {
-                incrementCounter(stimulusCounter, knowledgeBase[i]);
+                String stimulus = knowledgeBase[i];
+                incrementCounter(stimulusCounter, stimulus);
 
-                checkToTheLeft(knowledgeBase[i], i);
-                checkToTheRight(knowledgeBase[i], i);
+                checkToTheLeft(stimulus, i);
+                checkToTheRight(stimulus, i);
             }
         }
 
+        Set<String> connectedWords = connections.values().stream()
+                .flatMap(map -> map.keySet().stream())
+                .collect(Collectors.toSet());
 
+        updateFrequencies(connectedWords);
+
+        stimulusWords.forEach(stimulus -> {
+            associations.put(stimulus, new HashMap<>());
+            fillAssociations(stimulus);
+        });
+
+        saveAssociationsToFiles();
     }
 
     private void checkToTheRight(String stimulus, int i) {
         for (int j = i + 1; j <= i + 12 && j < knowledgeBase.length; j++) {
-            Pair<String, String> pair = new ImmutablePair(stimulus, knowledgeBase[j]);
-            incrementCounter(connections, pair);
+            if (stimulus.equals(knowledgeBase[j])) {
+                continue;
+            }
+
+            incrementCounter(connections, stimulus, knowledgeBase[j]);
         }
     }
 
     private void checkToTheLeft(String stimulus, int i) {
         for (int j = i - 1; j >= i - 12 && j >= 0; j--) {
-            Pair<String, String> pair = new ImmutablePair(stimulus, knowledgeBase[j]);
-            incrementCounter(connections, pair);
+            if (stimulus.equals(knowledgeBase[j])) {
+                continue;
+            }
+
+            incrementCounter(connections, stimulus, knowledgeBase[j]);
         }
     }
 
-    private void getFrequency(Set<String> words) {
+    private void updateFrequencies(Set<String> words) {
         Arrays.stream(knowledgeBase)
                 .filter(words::contains)
                 .forEach(word -> incrementCounter(otherFrequencies, word));
+    }
+
+    private void fillAssociations(String stimulus) {
+        Map<String, Integer> connectedWords = connections.get(stimulus);
+
+        connectedWords.keySet().forEach(word -> {
+            if (otherFrequencies.get(word) > BETA * knowledgeBase.length) {
+                double association = connectedWords.get(word) / Math.pow(otherFrequencies.get(word), ALPHA);
+                associations.get(stimulus).put(word, association);
+            } else {
+                double association = connectedWords.get(word) / (GAMMA * knowledgeBase.length);
+                associations.get(stimulus).put(word, association);
+            }
+        });
+    }
+
+    private void saveAssociationsToFiles() {
+        stimulusWords.forEach(stimulus -> {
+            try {
+                FileWriter fileWriter = new FileWriter(stimulus + ".txt");
+                PrintWriter printWriter = new PrintWriter(fileWriter);
+                Map<String, Double> words = associations.get(stimulus);
+                words.entrySet().stream()
+                        .sorted(Map.Entry.<String, Double>comparingByValue().reversed())
+                        .map(Map.Entry::getKey)
+                        .forEach(word -> printWriter.println(word + ": " + words.get(word).toString()));
+                printWriter.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
     }
 
     private static void incrementCounter(Map<String, Integer> counter, String key) {
         if (counter.containsKey(key)) {
             counter.put(key, counter.get(key) + 1);
         } else {
-            counter.put(key, 0);
+            counter.put(key, 1);
         }
     }
 
-    private static void incrementCounter(Map<Pair<String, String>, Integer> counter, Pair<String, String> key) {
+    private static void incrementCounter(Map<String, Map<String, Integer>> counter, String key, String connection) {
         if (counter.containsKey(key)) {
-            counter.put(key, counter.get(key) + 1);
+            Map<String, Integer> stringIntegerMap = counter.get(key);
+            incrementCounter(stringIntegerMap, connection);
         } else {
-            counter.put(key, 0);
+            counter.put(key, new HashMap<>());
+            Map<String, Integer> stringIntegerMap = counter.get(key);
+            incrementCounter(stringIntegerMap, connection);
         }
     }
 }
