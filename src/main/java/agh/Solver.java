@@ -16,6 +16,7 @@ public class Solver {
     private static final double ALPHA = 0.66;
     private static final double BETA = 0.00002;
     private static final double GAMMA = 0.00002;
+    private static final int EPSILON = 12;
 
     private String[] knowledgeBase;
     private Set<String> stimulusWords = ImmutableSet.of("matka", "dobra", "dom", "dziecko");
@@ -55,7 +56,7 @@ public class Solver {
     }
 
     private void checkToTheRight(String stimulus, int i) {
-        for (int j = i + 1; j <= i + 12 && j < knowledgeBase.length; j++) {
+        for (int j = i + 1; j <= i + EPSILON && j < knowledgeBase.length; j++) {
             if (stimulus.equals(knowledgeBase[j])) {
                 continue;
             }
@@ -65,7 +66,7 @@ public class Solver {
     }
 
     private void checkToTheLeft(String stimulus, int i) {
-        for (int j = i - 1; j >= i - 12 && j >= 0; j--) {
+        for (int j = i - 1; j >= i - EPSILON && j >= 0; j--) {
             if (stimulus.equals(knowledgeBase[j])) {
                 continue;
             }
