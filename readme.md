@@ -1,1 +1,1 @@
-## Projekt na WSDJN
+## Projekt na WDSJN
